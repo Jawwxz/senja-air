@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senja Air — Island Hopper at Dusk</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #160f2e; font-family: "Segoe UI", system-ui, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(10,4,28,.55) 100%); }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .panel { position: fixed; z-index: 3; color: #ffe9c4; background: rgba(12,8,32,.55);
+    border: 1px solid rgba(255,180,90,.35); border-radius: 10px; padding: 8px 12px;
+    backdrop-filter: blur(2px); font-size: 14px; line-height: 1.45; }
+  .panel b { color: #ffb45e; font-weight: 600; }
+  .num { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 20px; color: #fff3dd; }
+  .lbl { font-size: 10px; letter-spacing: .18em; color: #ffcf8e; text-transform: uppercase; }
+  #hud-left { top: 14px; left: 14px; min-width: 168px; }
+  #hud-right { top: 14px; right: 14px; text-align: right; min-width: 200px; }
+  #hud-compass { top: 14px; left: 50%; transform: translateX(-50%); padding: 6px 10px; overflow: hidden; width: 300px; text-align: center; }
+  #compass-tape { font-family: ui-monospace, Consolas, monospace; font-size: 15px; letter-spacing: .35em; color: #ffe9c4; white-space: nowrap; }
+  #compass-hdg { font-size: 20px; color: #fff3dd; font-family: ui-monospace, Consolas, monospace; }
+  #hud-throttle { bottom: 16px; left: 14px; display: flex; gap: 14px; align-items: flex-end; }
+  .bar { width: 16px; height: 110px; background: rgba(255,255,255,.12); border-radius: 8px; position: relative; overflow: hidden; border: 1px solid rgba(255,180,90,.35); }
+  .bar > i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg,#ffb45e,#ff7a3c); display: block; }
+  .bar.fuel > i { background: linear-gradient(180deg,#7be3a8,#2ea36b); }
+  .bar.hull > i { background: linear-gradient(180deg,#8fd0ff,#2f7fc9); }
+  #hud-horizon { bottom: 16px; right: 14px; text-align: center; }
+  #horizon { width: 150px; height: 150px; border-radius: 50%; border: 2px solid rgba(255,180,90,.5); background: #0a0620; }
+  #hud-msg { top: 22%; left: 50%; transform: translateX(-50%); z-index: 4; text-align: center; pointer-events: none;
+    color: #fff3dd; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  #hud-msg .big { font-size: 34px; font-weight: 700; letter-spacing: .04em; }
+  #hud-msg .sub { font-size: 16px; color: #ffcf8e; margin-top: 4px; }
+  #crosshair { position: fixed; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; z-index: 3; pointer-events: none; opacity: .85; }
+  #crosshair:before, #crosshair:after { content: ""; position: absolute; background: #ffe9c4; }
+  #crosshair:before { left: 12px; top: 0; width: 2px; height: 26px; }
+  #crosshair:after { top: 12px; left: 0; height: 2px; width: 26px; }
+  #cockpit-frame { position: fixed; inset: 0; z-index: 2; pointer-events: none; display: none;
+    background: linear-gradient(180deg, transparent 62%, rgba(8,5,20,.92) 78%, #06030f 100%); }
+  #cockpit-frame:before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
+    background: radial-gradient(ellipse 90% 130% at 50% 118%, #171126 55%, #0a0618 100%);
+    border-top: 3px solid #241a3d; }
+  .overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(22,10,46,.82), rgba(8,4,22,.88)); color: #ffe9c4; }
+  .card { max-width: 640px; width: 92%; background: rgba(20,12,44,.85); border: 1px solid rgba(255,180,90,.45);
+    border-radius: 16px; padding: 28px 32px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .card h1 { margin: 0 0 4px; font-size: 44px; letter-spacing: .06em; color: #ffb45e; }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 400; color: #ffcf8e; letter-spacing: .22em; text-transform: uppercase; }
+  .card p { font-size: 15px; line-height: 1.6; color: #f3e2c2; }
+  .card .keys { text-align: left; display: inline-block; font-size: 14px; line-height: 1.9; color: #ffe9c4; }
+  .card .keys b { color: #ffb45e; display: inline-block; min-width: 150px; }
+  .btn { display: inline-block; margin: 6px 4px 0; padding: 11px 22px; font-size: 16px; cursor: pointer;
+    color: #1c0f04; background: linear-gradient(180deg,#ffc46b,#ff8f3c); border: none; border-radius: 10px; font-weight: 700; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: transparent; color: #ffcf8e; border: 1px solid rgba(255,180,90,.6); }
+  .mission-btn { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 10px 14px; cursor: pointer;
+    background: rgba(255,180,90,.08); border: 1px solid rgba(255,180,90,.35); border-radius: 10px; color: #ffe9c4; font-size: 15px; }
+  .mission-btn:hover { background: rgba(255,180,90,.18); }
+  .mission-btn.locked { opacity: .45; cursor: not-allowed; }
+  .mission-btn b { color: #ffb45e; }
+  #hud-warn { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); z-index: 4; color: #ff5d5d;
+    font-weight: 700; font-size: 18px; letter-spacing: .12em; text-shadow: 0 2px 8px rgba(0,0,0,.8); display: none; }
+  .hidden { display: none !important; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Senja Air: fly a small prop plane between Indonesian islands at dusk, through glowing rings, and land on the runway"></canvas>
+<div id="vignette"></div>
+<div id="cockpit-frame"></div>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud-left" class="panel hidden">
+  <div class="lbl">Altitude</div><div class="num"><span id="hud-alt">0</span> ft</div>
+  <div class="lbl">Speed</div><div class="num"><span id="hud-spd">0</span> kt</div>
+  <div class="lbl">Vertical speed</div><div class="num"><span id="hud-vs">0</span> ft/min</div>
+</div>
+<div id="hud-compass" class="panel hidden">
+  <div id="compass-tape">N&nbsp;&nbsp;030&nbsp;&nbsp;060&nbsp;&nbsp;E&nbsp;&nbsp;120&nbsp;&nbsp;150&nbsp;&nbsp;S&nbsp;&nbsp;210&nbsp;&nbsp;240&nbsp;&nbsp;W&nbsp;&nbsp;300&nbsp;&nbsp;330</div>
+  <div><span id="compass-hdg">000&deg;</span></div>
+</div>
+<div id="hud-right" class="panel hidden">
+  <div class="lbl" id="hud-mission">Mission 1 &middot; Senja Pertama</div>
+  <div><b>Rings</b> <span id="hud-rings" class="num">0/5</span></div>
+  <div><b>Score</b> <span id="hud-score" class="num">0</span></div>
+  <div><b>Time</b> <span id="hud-time" class="num">5:00</span></div>
+</div>
+<div id="hud-throttle" class="panel hidden">
+  <div style="text-align:center"><div class="bar"><i id="bar-thr" style="height:0%"></i></div><div class="lbl">Thr</div></div>
+  <div style="text-align:center"><div class="bar fuel"><i id="bar-fuel" style="height:100%"></i></div><div class="lbl">Fuel</div></div>
+  <div style="text-align:center"><div class="bar hull"><i id="bar-hull" style="height:100%"></i></div><div class="lbl">Hull</div></div>
+</div>
+<div id="hud-horizon" class="panel hidden">
+  <canvas id="horizon" width="150" height="150"></canvas>
+  <div class="lbl">Attitude</div>
+</div>
+<div id="hud-msg"><div class="big" id="msg-big"></div><div class="sub" id="msg-sub"></div></div>
+<div id="hud-warn"></div>
+<div id="crosshair" class="hidden"></div>
+
+<div id="title-screen" class="overlay">
+  <div class="card">
+    <h1>SENJA AIR</h1>
+    <h2>Island Hopper &middot; Dusk over the Archipelago</h2>
+    <p>Fly a little prop plane between three Indonesian islands as the sun sets.
+    Thread the glowing rings, watch your fuel, and put her down gently on the
+    runway. Three sorties, one dusk — from golden hour to a night landing lit
+    only by runway lights.</p>
+    <div id="mission-list"></div>
+    <div class="keys">
+      <div><b>&uarr; / &darr;</b> pitch down / up (pull back to climb)</div>
+      <div><b>&larr; / &rarr;</b> bank left / right to turn</div>
+      <div><b>W / S</b> throttle up / down &nbsp; <b>Space</b> airbrake</div>
+      <div><b>Mouse</b> hold left button and steer</div>
+      <div><b>C</b> chase / cockpit camera &nbsp; <b>M</b> sound &nbsp; <b>P</b> pause &nbsp; <b>R</b> restart</div>
+    </div>
+    <p style="font-size:13px;color:#c9a882;">A complete offline game. No network, no account, just you and the dusk.</p>
+  </div>
+</div>
+
+<div id="end-screen" class="overlay hidden">
+  <div class="card">
+    <h1 id="end-title">Landed!</h1>
+    <h2 id="end-sub"></h2>
+    <p id="end-detail"></p>
+    <div id="end-buttons"></div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
